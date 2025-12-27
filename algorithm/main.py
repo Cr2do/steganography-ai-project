@@ -1,6 +1,6 @@
 from algorithm.DCT.dct import DCT
 from algorithm.LSB.lsb import LSB
-from algorithm.utils import metrics, attack_transform_img_to_jpeg
+from algorithm.utils import metrics, attack_transform_img_to_jpeg, calcul_capacity_max
 
 
 def lsb_process(input_image_path, output_image_path, attacked_lsb_path, message):
@@ -13,7 +13,7 @@ def lsb_process(input_image_path, output_image_path, attacked_lsb_path, message)
     p , s = metrics(input_image_path, output_image_path)
     print(f'Metric 1 : Visual quality is {p} dB ; SSIm is {s}')
 
-    attack_transform_img_to_jpeg(output_image_path, attacked_lsb_path, 50)
+    attack_transform_img_to_jpeg(output_image_path, attacked_lsb_path, 80)
 
     try:
         p , s = metrics(output_image_path, attacked_lsb_path)
@@ -58,11 +58,17 @@ class Main:
     input_image_path = "./assets/results/input.png"
     output_image_path = "./assets/results/output.png"
 
-    attacked_path = './assets/results/attack.jpg'
+    attacked_path = './assets/results/attack.jpeg'
 
-    message = 'HELLO DCT'
+    message = 'lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum'
 
-    dct_process(input_image_path, output_image_path, attacked_path, message)
+    capacity = calcul_capacity_max(input_image_path, 1, 8)
+
+    if len(message) > capacity:
+        print(f'Message too long; {capacity}')
+    else:
+        print(f'capacity is : {capacity}')
+        dct_process(input_image_path, output_image_path, attacked_path, message)
 
     #lsb_process(input_image_path, output_image_path, attacked_path, message)
 
