@@ -9,56 +9,64 @@ class DCT:
         self.Delimiter = '\0'
 
     def sign(self, image_path, secret_message, output_path):
-        img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
-        h, w = img.shape
+        # 1. LIRE EN COULEUR (Plus de GRAYSCALE ici)
+        img = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        if img is None:
+            print("Erreur lecture image")
+            return
 
+        h, w, _ = img.shape
 
-        img = np.float32(img)
+        # 2. CONVERSION BGR -> YCrCb
+        # OpenCV utilise BGR par défaut, on convertit en YCrCb
+        ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
+
+        # 3. SÉPARATION DES CANAUX
+        # y = Luminance (Noir et blanc), cr/cb = Couleurs
+        y, cr, cb = cv2.split(ycrcb)
+
+        # On va travailler UNIQUEMENT sur le canal Y
+        y_float = np.float32(y)
 
         full_message = secret_message + self.Delimiter
-
-        # Conversion message en binaire
         msg_bin = ''.join(format(ord(i), '08b') for i in full_message)
         msg_idx = 0
+        len_msg = len(msg_bin)
 
-        # Découpage en blocs 8x8
+        # 4. BOUCLE DCT (Idem avant, mais sur y_float)
         for i in range(0, h, 8):
             for j in range(0, w, 8):
-                if msg_idx >= len(msg_bin): break
+                if msg_idx >= len_msg: break
 
-                # Récupération du bloc
-                block = img[i:i+8, j:j+8]
-
-                # Application de la DCT
+                block = y_float[i:i+8, j:j+8]
                 dct_block = cv2.dct(block)
 
-                # Insertion dans un coefficient moyen (ex: position 4,4)
-                # Si bit=1, on rend le coeff pair, sinon impair (méthode simplifiée)
                 coeff = dct_block[4, 4]
-
                 bit = int(msg_bin[msg_idx])
 
-                val  = round(coeff / self.Q)
-
+                val = round(coeff / self.Q)
                 if val % 2 != bit:
                     val -= 1
 
                 new_coef = val * self.Q
-
                 dct_block[4, 4] = new_coef
 
-                # Inverse DCT
-                img[i:i+8, j:j+8] = cv2.idct(dct_block)
+                y_float[i:i+8, j:j+8] = cv2.idct(dct_block)
                 msg_idx += 1
 
-        # Sauvegarde (Attention: le format image doit supporter les floats ou on perd de l'info en convertissant en int)
-        # Pour le test, on sauvegarde en PNG pour ne pas compresser deux fois
+        # 5. RECONSTITUTION
+        # On remet le canal Y au format correct (0-255)
+        y_final = np.clip(y_float, 0, 255)
+        y_final = np.uint8(y_final)
 
-        img_final = np.clip(img, 0, 255)
-        img_final = np.uint8(img_final)
+        # On fusionne Y (modifié) avec Cr et Cb (originaux)
+        merged_ycrcb = cv2.merge([y_final, cr, cb])
 
-        cv2.imwrite(output_path, img_final)
-        print(f"[DCT] Image signée sauvegardée : {output_path}")
+        # On reconvertit en BGR pour la sauvegarde
+        final_img = cv2.cvtColor(merged_ycrcb, cv2.COLOR_YCrCb2BGR)
+
+        cv2.imwrite(output_path, final_img)
+        print(f"[DCT] Image signée COULEUR sauvegardée : {output_path}")
 
     def read(self, image_path):
         img = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)

@@ -60,6 +60,7 @@ class Main:
 
     attacked_path = './assets/results/attack.jpeg'
 
+
     message = 'lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum lorem ipsum'
 
     capacity = calcul_capacity_max(input_image_path, 1, 8)
@@ -68,7 +69,18 @@ class Main:
         print(f'Message too long; {capacity}')
     else:
         print(f'capacity is : {capacity}')
-        dct_process(input_image_path, output_image_path, attacked_path, message)
+        dct_algo = DCT()
+
+        recup = dct_algo.read('./assets/results/output.png')
+        print(f'Message inside is {recup}')
+        if message in recup:
+            print(f'Success {recup}')
+        else:
+            print('DCT Not working')
+        #dct_algo.sign(input_image_path, message, output_image_path)
+        #dct_algo.read('./assets/results/resize_1.jpg')
+
+        # dct_process(input_image_path, output_image_path, attacked_path, message)
 
     #lsb_process(input_image_path, output_image_path, attacked_path, message)
 
