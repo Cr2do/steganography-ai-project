@@ -10,7 +10,6 @@ Uses [reedsolomon.js](https://github.com/cho45/reedsolomon.js/)
 
 ## Usage
 
-The project is fully static. You can host on any static html hosting server by pointing or uploading the files in this repo. I specifically used python
 
 ```
 $ python -m http.server
