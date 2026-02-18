@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 
 def attack_jpeg_compression(image_path, output_path, quality=50):
     """Simulates JPEG compression."""
@@ -46,4 +47,21 @@ def attack_noise(image_path, output_path, mean=0, var=0.01):
     noisy_img = np.clip(noisy_img, 0, 1)
     noisy_img = (noisy_img * 255).astype(np.uint8)
     cv2.imwrite(output_path, noisy_img)
+    return True
+
+def attack_convert_format(image_path, output_path):
+    """Converts image format (e.g., PNG to JPG or vice versa)."""
+    img = cv2.imread(image_path)
+    if img is None:
+        return False
+    
+    # If converting to JPG, use default quality (usually 95 in cv2) or specify it.
+    # If converting to PNG, it's lossless.
+    # We just write to the new path, cv2 handles extension.
+    
+    if output_path.lower().endswith(('.jpg', '.jpeg')):
+        # Use standard quality 90 for conversion attack
+        cv2.imwrite(output_path, img, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    else:
+        cv2.imwrite(output_path, img)
     return True
