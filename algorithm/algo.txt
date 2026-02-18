@@ -1,0 +1,25 @@
+
+
+The concept of mixing DWT and SVD was popularized by Ganic and Eskicioglu. While their specific method differed slightly (they added watermark singular values to host singular values), they established the field.
+
+Paper: Robust embedding of visual watermarks using discrete wavelet transform and singular value decomposition
+Authors: E. Ganic and A. M. Eskicioglu
+Year: 2004
+Journal: Journal of Electronic Imaging
+
+
+
+Paper: A robust image watermarking scheme based on singular value decomposition using genetic algorithm (and similar titles)
+Authors: Lai, C. C., & Tsai, C. C.
+Year: 2010
+Context: They refined the block-based SVD approach to fix issues in the original Ganic paper.
+
+
+Implementation SIFT ou correction d'homographie
+
+=> Signal Processing
+
+=> Computer Vision
+
+=> Deep Learning
+
