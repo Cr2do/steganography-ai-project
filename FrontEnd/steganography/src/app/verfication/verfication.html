@@ -1,1 +1,81 @@
-<p>verfication works!</p>
+<div class="card bg-base-100 shadow">
+	<div class="card-body">
+		<h2 class="card-title">Verification</h2>
+		<p class="text-base-content/70">Choose what you want to verify:</p>
+
+		<div class="join mt-2">
+			<button
+				class="btn join-item"
+				[class.btn-primary]="mode() === 'ai'"
+				(click)="setMode('ai')"
+			>
+				AI-generated image
+			</button>
+			<button
+				class="btn join-item"
+				[class.btn-primary]="mode() === 'signature'"
+				(click)="setMode('signature')"
+			>
+				Signature
+			</button>
+		</div>
+
+		<div class="mt-4">
+			@if (mode() === 'ai') {
+				<div class="flex flex-col gap-3">
+					<div class="form-control">
+						<label class="label">
+							<span class="label-text">Upload an image</span>
+						</label>
+						<input
+							type="file"
+							accept="image/*"
+							class="file-input file-input-bordered w-full"
+							(change)="onFileSelected($event)"
+						/>
+					</div>
+
+					@if (previewUrl()) {
+						<img class="max-w-xs rounded-box" [src]="previewUrl()" alt="Selected image" />
+					}
+
+					<button class="btn btn-primary" (click)="runAiCheck()">Analyze</button>
+
+					@if (resultMessage()) {
+						<div class="alert">
+							<span>{{ resultMessage() }}</span>
+						</div>
+					}
+				</div>
+			} @else if (mode() === 'signature') {
+				<div class="flex flex-col gap-3">
+					<div class="form-control">
+						<label class="label">
+							<span class="label-text">Upload an image</span>
+						</label>
+						<input
+							type="file"
+							accept="image/*"
+							class="file-input file-input-bordered w-full"
+							(change)="onFileSelected($event)"
+						/>
+					</div>
+
+					@if (previewUrl()) {
+						<img class="max-w-xs rounded-box" [src]="previewUrl()" alt="Selected image" />
+					}
+
+					<button class="btn btn-primary" (click)="runSignatureCheck()">Verify signature</button>
+
+					@if (resultMessage()) {
+						<div class="alert">
+							<span>{{ resultMessage() }}</span>
+						</div>
+					}
+				</div>
+			} @else {
+				<div class="text-base-content/70">Select one of the options above.</div>
+			}
+		</div>
+	</div>
+</div>

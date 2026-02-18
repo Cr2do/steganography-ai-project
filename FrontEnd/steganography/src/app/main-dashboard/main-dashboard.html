@@ -1,2 +1,43 @@
-<p>main-dashboard works!</p>
-lorem ipsum dolor sit amet consectetur adipisicing elit
+<div class="min-h-screen bg-base-200">
+	<div class="mx-auto max-w-5xl px-4 py-10">
+		<div class="hero rounded-box bg-base-100">
+			<div class="hero-content w-full flex-col items-start gap-6">
+				<div>
+					<h1 class="text-3xl font-bold">Steganography</h1>
+					<p class="text-base-content/70">
+						Choose an action: verify a hidden message or sign/encode.
+					</p>
+				</div>
+
+				<div class="join">
+					<button
+						class="btn join-item"
+						[class.btn-primary]="mode() === 'verify'"
+						(click)="setMode('verify')"
+					>
+						Verify
+					</button>
+					<button
+						class="btn join-item"
+						[class.btn-primary]="mode() === 'sign'"
+						(click)="setMode('sign')"
+					>
+						Sign
+					</button>
+				</div>
+			</div>
+		</div>
+
+		<div class="mt-8">
+			@if (mode() === 'verify') {
+				<app-verfication></app-verfication>
+			} @else if (mode() === 'sign') {
+				<app-authentifier></app-authentifier>
+			} @else {
+				<div class="alert">
+					<span>Select a button to get started.</span>
+				</div>
+			}
+		</div>
+	</div>
+</div>
