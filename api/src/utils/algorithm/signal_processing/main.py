@@ -81,10 +81,10 @@ def main():
 
     input_image = "../assets/christmas.jpg"
     if not os.path.exists(input_image):
-        if os.path.exists("../assets"):
-             files = [f for f in os.listdir("../assets") if f.endswith(".jpg") or f.endswith(".png")]
+        if os.path.exists("../../../../assets"):
+             files = [f for f in os.listdir("../../../../assets") if f.endswith(".jpg") or f.endswith(".png")]
              if files:
-                 input_image = os.path.join("../assets", files[0])
+                 input_image = os.path.join("../../../../assets", files[0])
              else:
                  print("No input image found.")
                  return

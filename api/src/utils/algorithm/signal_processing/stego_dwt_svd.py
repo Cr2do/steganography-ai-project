@@ -1,117 +1,129 @@
 import cv2
 import numpy as np
-from utils import text_to_bin, bin_to_text
+import pywt
+from .utils import text_to_bin, bin_to_text
 
-class DCTSteganography:
+class DWTSVDSteganography:
     """
-    Production-Grade DCT Steganography.
+    Production-Grade DWT-SVD Steganography.
     Features:
     - Strict Chain Check.
     - Confidence Threshold (> 60%).
     - Zero False Positive Strategy.
     """
-    def __init__(self):
-        self.block_size = 8
-        self.u1, self.v1 = 3, 4 
-        self.u2, self.v2 = 4, 3
-        self.P = 50 
+    def __init__(self, block_size=2, q_step=30):
+        self.block_size = block_size
+        self.q_step = q_step
         self.MAGIC = '0101001101010100' # "STGO"
         self.MAX_CHARS = 20
 
-    def _embed_bit(self, dct_block, bit):
-        c1 = dct_block[self.u1, self.v1]
-        c2 = dct_block[self.u2, self.v2]
-        if bit == 0:
-            if c1 <= c2 + self.P:
-                diff = (c2 + self.P - c1) / 2.0
-                c1 += diff + 1
-                c2 -= diff + 1
-        else: 
-            if c1 + self.P >= c2:
-                diff = (c1 + self.P - c2) / 2.0
-                c2 += diff + 1
-                c1 -= diff + 1
-        dct_block[self.u1, self.v1] = c1
-        dct_block[self.u2, self.v2] = c2
-        return dct_block
+    def _embed_bit(self, block, bit):
+        u, s, vt = np.linalg.svd(block)
+        val = s[0]
+        k = round(val / self.q_step)
+        if k % 2 != bit:
+            k += 1
+        s[0] = k * self.q_step
+        return u @ np.diag(s) @ vt
 
-    def _extract_bit(self, dct_block):
-        c1 = dct_block[self.u1, self.v1]
-        c2 = dct_block[self.u2, self.v2]
-        return 0 if c1 > c2 else 1
+    def _extract_bit(self, block):
+        u, s, vt = np.linalg.svd(block)
+        val = s[0]
+        k = round(val / self.q_step)
+        return k % 2
 
-    def embed(self, image_path, text, output_path):
+    def embed(self, img, text):
+        """
+        Embeds text into the image using DWT-SVD.
+        :param img: Input image (numpy array, BGR)
+        :param text: Text to embed
+        :return: Stego image (numpy array, BGR)
+        """
         if len(text) > self.MAX_CHARS:
             raise ValueError(f"Text too long! Max {self.MAX_CHARS} chars allowed.")
             
-        img = cv2.imread(image_path)
         if img is None:
-            raise ValueError(f"Image not found: {image_path}")
-            
+            raise ValueError("Image is None")
+        
         h, w = img.shape[:2]
-        h = (h // 8) * 8
-        w = (w // 8) * 8
-        img = img[:h, :w]
+        h_new = (h // (self.block_size * 2)) * (self.block_size * 2)
+        w_new = (w // (self.block_size * 2)) * (self.block_size * 2)
+        img = cv2.resize(img, (w_new, h_new))
         
         ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
         y, cr, cb = cv2.split(ycrcb)
-        y_float = np.float32(y)
+        
+        coeffs = pywt.dwt2(np.float32(y), 'haar')
+        LL, (LH, HL, HH) = coeffs
+        
+        sub_h, sub_w = HL.shape
+        max_bits = (sub_h // self.block_size) * (sub_w // self.block_size)
         
         msg_bits = text_to_bin(text)
         length_bits = format(len(msg_bits), '016b')
         packet = self.MAGIC + length_bits + msg_bits
         packet_len = len(packet)
         
-        total_blocks = (h // 8) * (w // 8)
-        full_stream = packet * (total_blocks // packet_len)
-        remainder = total_blocks - len(full_stream)
+        if packet_len > max_bits:
+            raise ValueError(f"Text too long! Image can hold {max_bits} bits, needed {packet_len}.")
+            
+        full_stream = packet * (max_bits // packet_len)
+        remainder = max_bits - len(full_stream)
         full_stream += packet[:remainder]
         
         idx = 0
-        for i in range(0, h, 8):
-            for j in range(0, w, 8):
+        HL_new = HL.copy()
+        
+        for i in range(0, sub_h, self.block_size):
+            for j in range(0, sub_w, self.block_size):
                 if idx < len(full_stream):
-                    block = y_float[i:i+8, j:j+8]
-                    dct_block = cv2.dct(block)
+                    block = HL[i:i+self.block_size, j:j+self.block_size]
                     bit = int(full_stream[idx])
-                    dct_block = self._embed_bit(dct_block, bit)
-                    y_float[i:i+8, j:j+8] = cv2.idct(dct_block)
+                    block_new = self._embed_bit(block, bit)
+                    HL_new[i:i+self.block_size, j:j+self.block_size] = block_new
                     idx += 1
         
-        y_new = np.clip(y_float, 0, 255).astype(np.uint8)
+        coeffs_new = LL, (LH, HL_new, HH)
+        y_new = pywt.idwt2(coeffs_new, 'haar')
+        y_new = np.clip(y_new, 0, 255).astype(np.uint8)
         ycrcb_new = cv2.merge([y_new, cr, cb])
         img_new = cv2.cvtColor(ycrcb_new, cv2.COLOR_YCrCb2BGR)
         
-        if output_path.lower().endswith(('.jpg', '.jpeg')):
-            cv2.imwrite(output_path, img_new, [cv2.IMWRITE_JPEG_QUALITY, 95])
-        else:
-            cv2.imwrite(output_path, img_new)
-        print(f"Saved Robust DCT stego image to {output_path}")
+        return img_new
 
-    def extract(self, image_path):
-        img = cv2.imread(image_path)
+    def extract(self, img):
+        """
+        Extracts text from the image using DWT-SVD.
+        :param img: Stego image (numpy array, BGR)
+        :return: Extracted text or None if not found
+        """
         if img is None:
-            raise ValueError(f"Image not found: {image_path}")
+            raise ValueError("Image is None")
             
         h, w = img.shape[:2]
-        ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
-        y, cr, cb = cv2.split(ycrcb)
-        y_float = np.float32(y)
+        print("Scanning for signal (DWT)...")
         
-        print("Scanning for signal...")
-        
-        for dy in range(8):
-            for dx in range(8):
+        for dy in range(4):
+            for dx in range(4):
+                if h - dy < 16 or w - dx < 16: continue
+                
+                img_crop = img[dy:h, dx:w]
+                ycrcb = cv2.cvtColor(img_crop, cv2.COLOR_BGR2YCrCb)
+                y, cr, cb = cv2.split(ycrcb)
+                coeffs = pywt.dwt2(np.float32(y), 'haar')
+                LL, (LH, HL, HH) = coeffs
+                sub_h, sub_w = HL.shape
+                
                 all_bits = []
                 count = 0
-                limit = 50000 
+                limit = 50000
                 
-                for i in range(dy, h - 7, 8):
-                    for j in range(dx, w - 7, 8):
+                for i in range(0, sub_h, self.block_size):
+                    for j in range(0, sub_w, self.block_size):
                         if count >= limit: break
-                        block = y_float[i:i+8, j:j+8]
-                        dct_block = cv2.dct(block)
-                        all_bits.append(self._extract_bit(dct_block))
+                        if i + self.block_size > sub_h or j + self.block_size > sub_w: continue
+                        block = HL[i:i+self.block_size, j:j+self.block_size]
+                        all_bits.append(self._extract_bit(block))
                         count += 1
                     if count >= limit: break
                 
@@ -148,11 +160,11 @@ class DCTSteganography:
                             continue
                     
                     full_bits = []
-                    for i in range(dy, h - 7, 8):
-                        for j in range(dx, w - 7, 8):
-                            block = y_float[i:i+8, j:j+8]
-                            dct_block = cv2.dct(block)
-                            full_bits.append(self._extract_bit(dct_block))
+                    for i in range(0, sub_h, self.block_size):
+                        for j in range(0, sub_w, self.block_size):
+                            if i + self.block_size > sub_h or j + self.block_size > sub_w: continue
+                            block = HL[i:i+self.block_size, j:j+self.block_size]
+                            full_bits.append(self._extract_bit(block))
                     
                     aligned_bits = full_bits[found_idx:]
                     num_copies = len(aligned_bits) // packet_len
@@ -169,21 +181,20 @@ class DCTSteganography:
                     
                     # CONFIDENCE THRESHOLD
                     if confidence < 0.6:
-                        # Signal too weak/noisy
                         start_search = found_idx + 1
                         continue
-
+                    
                     payload_bits = final_bits[32:]
                     payload_str = "".join(map(str, payload_bits))
                     
                     try:
                         recovered_text = bin_to_text(payload_str)
                         if len(recovered_text) > 0:
-                             print(f"Signal found at Grid({dy},{dx}) Offset {found_idx}. Confidence: {confidence:.2f}")
-                             return recovered_text
+                            print(f"Signal found at Grid({dy},{dx}) Offset {found_idx}. Confidence: {confidence:.2f}")
+                            return recovered_text
                     except:
                         pass
                     
-                    return "Message corrupted"
-
-        return "Message not found"
+                    start_search = found_idx + 1
+                        
+        return None

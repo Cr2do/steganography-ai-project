@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from utils import text_to_bin, bin_to_text
+from .utils import text_to_bin, bin_to_text
 
 class DCTSteganography:
     """
@@ -41,11 +41,17 @@ class DCTSteganography:
         return 0 if c1 > c2 else 1
 
     def embed(self, img, text):
+        """
+        Embeds text into the image using DCT.
+        :param img: Input image (numpy array, BGR)
+        :param text: Text to embed
+        :return: Stego image (numpy array, BGR)
+        """
         if len(text) > self.MAX_CHARS:
             raise ValueError(f"Text too long! Max {self.MAX_CHARS} chars allowed.")
             
         if img is None:
-            raise ValueError(f"Image not found")
+            raise ValueError("Image is None")
             
         h, w = img.shape[:2]
         h = (h // 8) * 8
@@ -84,8 +90,13 @@ class DCTSteganography:
         return img_new
 
     def extract(self, img):
+        """
+        Extracts text from the image using DCT.
+        :param img: Stego image (numpy array, BGR)
+        :return: Extracted text or None if not found
+        """
         if img is None:
-            raise ValueError(f"Image not found")
+            raise ValueError("Image is None")
             
         h, w = img.shape[:2]
         ycrcb = cv2.cvtColor(img, cv2.COLOR_BGR2YCrCb)
@@ -178,6 +189,7 @@ class DCTSteganography:
                     except:
                         pass
                     
-                    return "Message corrupted"
+                    # Continue searching in the same stream just in case
+                    start_search = found_idx + 1
 
-        return "Message not found"
+        return None
