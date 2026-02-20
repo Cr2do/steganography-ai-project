@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 import pywt
+import hashlib
+import hmac
 from .utils import text_to_bin, bin_to_text
 
 class DWTSVDSteganography:
@@ -10,12 +12,14 @@ class DWTSVDSteganography:
     - Strict Chain Check.
     - Confidence Threshold (> 60%).
     - Zero False Positive Strategy.
+    - HMAC Integrity Check.
     """
-    def __init__(self, block_size=2, q_step=30):
+    def __init__(self, block_size=4, q_step=50):
         self.block_size = block_size
         self.q_step = q_step
         self.MAGIC = '0101001101010100' # "STGO"
         self.MAX_CHARS = 20
+        self.SECRET_KEY = b'my_secret_key_123' # In production, load from env
 
     def _embed_bit(self, block, bit):
         u, s, vt = np.linalg.svd(block)
@@ -32,12 +36,16 @@ class DWTSVDSteganography:
         k = round(val / self.q_step)
         return k % 2
 
+    def _calculate_hmac(self, text):
+        """Calculates HMAC-SHA256 of the text (truncated to 16 bits for embedding space)."""
+        h = hmac.new(self.SECRET_KEY, text.encode('utf-8'), hashlib.sha256)
+        digest = h.hexdigest()
+        return bin(int(digest[:4], 16))[2:].zfill(16)
+
     def embed(self, img, text):
         """
         Embeds text into the image using DWT-SVD.
-        :param img: Input image (numpy array, BGR)
-        :param text: Text to embed
-        :return: Stego image (numpy array, BGR)
+        Payload Structure: MAGIC (16) + LEN (16) + HMAC (16) + MSG (N)
         """
         if len(text) > self.MAX_CHARS:
             raise ValueError(f"Text too long! Max {self.MAX_CHARS} chars allowed.")
@@ -61,7 +69,9 @@ class DWTSVDSteganography:
         
         msg_bits = text_to_bin(text)
         length_bits = format(len(msg_bits), '016b')
-        packet = self.MAGIC + length_bits + msg_bits
+        hmac_bits = self._calculate_hmac(text)
+        
+        packet = self.MAGIC + length_bits + hmac_bits + msg_bits
         packet_len = len(packet)
         
         if packet_len > max_bits:
@@ -94,8 +104,7 @@ class DWTSVDSteganography:
     def extract(self, img):
         """
         Extracts text from the image using DWT-SVD.
-        :param img: Stego image (numpy array, BGR)
-        :return: Extracted text or None if not found
+        Verifies HMAC integrity.
         """
         if img is None:
             raise ValueError("Image is None")
@@ -136,9 +145,12 @@ class DWTSVDSteganography:
                     found_idx = bit_stream.find(self.MAGIC, start_search)
                     if found_idx == -1: break
                     
-                    if found_idx + 32 > len(bit_stream): break
+                    # Header is now 48 bits
+                    if found_idx + 48 > len(bit_stream): break
                     
                     length_bin = bit_stream[found_idx+16 : found_idx+32]
+                    hmac_bin = bit_stream[found_idx+32 : found_idx+48]
+                    
                     try:
                         msg_len_bits = int(length_bin, 2)
                     except:
@@ -149,7 +161,7 @@ class DWTSVDSteganography:
                         start_search = found_idx + 1
                         continue
                         
-                    packet_len = 32 + msg_len_bits
+                    packet_len = 48 + msg_len_bits
                     
                     next_packet_idx = found_idx + packet_len
                     if next_packet_idx + 16 <= len(bit_stream):
@@ -184,14 +196,19 @@ class DWTSVDSteganography:
                         start_search = found_idx + 1
                         continue
                     
-                    payload_bits = final_bits[32:]
+                    payload_bits = final_bits[48:]
                     payload_str = "".join(map(str, payload_bits))
                     
                     try:
                         recovered_text = bin_to_text(payload_str)
                         if len(recovered_text) > 0:
-                            print(f"Signal found at Grid({dy},{dx}) Offset {found_idx}. Confidence: {confidence:.2f}")
-                            return recovered_text
+                            # Verify HMAC
+                            expected_hmac = self._calculate_hmac(recovered_text)
+                            if expected_hmac == hmac_bin:
+                                print(f"Signal found & Verified at Grid({dy},{dx}) Offset {found_idx}. Confidence: {confidence:.2f}")
+                                return recovered_text
+                            else:
+                                print(f"Signal found but HMAC failed. Possible tampering.")
                     except:
                         pass
                     

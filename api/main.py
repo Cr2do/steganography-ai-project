@@ -1,11 +1,21 @@
 from fastapi import FastAPI
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from src.routes import router as api_router
 
 app = FastAPI(
     title="Steganography AI API",
     description="API for embedding and extracting hidden messages in images using DCT and DWT-SVD algorithms.",
     version="1.0.0"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 app.include_router(api_router)
