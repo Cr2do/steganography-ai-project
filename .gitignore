@@ -1,2 +1,12 @@
+# Python
+__pycache__/
+
+api/src/routes/__pycache__
+api/src/services/__pycache__
+api/src/utils/algorithm/__pycache__
+api/src/utils/algorithm/signal_processing/__pycache__
+
+api/venv
+
 .idea
-venv
+vscode
